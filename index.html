@@ -85,12 +85,35 @@
                 MC Animator Pro
             </button>
 
+            <button onclick="showSection('dino-actions')" class="group relative px-6 py-3 font-bold text-white rounded-xl bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 transition-all shadow-lg hover:shadow-yellow-500/30 w-full transform hover:-translate-y-1">
+                Google Dinosaur
+            </button>
+
             <button onclick="showSection('minecraft-actions')" class="group relative px-6 py-3 font-bold text-white rounded-xl bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 transition-all shadow-lg hover:shadow-green-500/30 w-full transform hover:-translate-y-1">
                 Скачать Minecraft Parkour
             </button>
 
             <button onclick="showSection('win12-actions')" class="group relative px-6 py-3 font-bold text-white rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 transition-all shadow-lg hover:shadow-blue-500/30 w-full transform hover:-translate-y-1">
                 Перейти на Windows 12 HTML
+            </button>
+        </div>
+    </div>
+
+    <!-- Dino Actions -->
+    <div id="dino-actions" class="hidden h-full flex flex-col items-center justify-center transition-all duration-500">
+        <div class="glass-panel p-10 rounded-2xl flex flex-col items-center gap-6 max-w-md w-full mx-4 relative">
+            <button onclick="showSection('main-menu')" class="absolute top-4 left-4 text-gray-400 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            
+            <h2 class="text-3xl font-bold text-center mt-2 bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-orange-500">Google Dinosaur</h2>
+            
+            <a href="https://disk.yandex.ru/d/HTID8CKM5YWXjg" target="_blank" class="w-full text-center px-6 py-3 font-bold text-white rounded-xl bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 transition-all shadow-lg hover:shadow-green-500/30 transform hover:-translate-y-1">
+                Скачать HTML
+            </a>
+            
+            <button onclick="showSection('dino-game'); initDinoGame()" class="w-full px-6 py-3 font-bold text-white rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 transition-all shadow-lg hover:shadow-purple-500/30 transform hover:-translate-y-1">
+                Протестировать тут
             </button>
         </div>
     </div>
@@ -150,6 +173,20 @@
                 Протестировать тут
             </button>
         </div>
+    </div>
+
+    <!-- Section: Dino Game -->
+    <div id="dino-game" class="hidden h-full flex flex-col items-center justify-center bg-white text-black relative select-none">
+        <div class="absolute top-4 left-4 flex gap-4 items-center z-10">
+            <button onclick="showSection('main-menu'); stopDinoGame()" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 font-bold">Меню</button>
+            <span id="dino-score" class="font-mono text-xl">Score: 0</span>
+        </div>
+        <canvas id="dino-canvas" class="border-b-2 border-gray-400 w-full h-full max-h-[400px]"></canvas>
+        <div id="dino-gameover" class="hidden absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
+            <h2 class="text-4xl font-bold mb-4">GAME OVER</h2>
+            <button onclick="resetDinoGame()" class="px-6 py-3 bg-blue-600 rounded-xl hover:bg-blue-500 font-bold shadow-lg">Играть заново</button>
+        </div>
+        <div class="absolute bottom-10 text-gray-500">Нажми ПРОБЕЛ чтобы прыгнуть</div>
     </div>
 
     <!-- Section 3: Desktop Simulation -->
@@ -357,7 +394,7 @@
     <script>
         // Navigation Logic
         function showSection(sectionId) {
-            ['main-menu', 'win12-actions', 'minecraft-actions', 'win12-desktop', 'game-creator', 'mc-animator-actions', 'mc-animator-editor'].forEach(id => {
+            ['main-menu', 'win12-actions', 'minecraft-actions', 'win12-desktop', 'game-creator', 'mc-animator-actions', 'mc-animator-editor', 'dino-actions', 'dino-game'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.add('hidden');
             });
@@ -367,7 +404,7 @@
 
             // Clean up
             if(sectionId !== 'game-creator' && window.stopGameTest) window.stopGameTest();
-            // We don't stop the animator entirely to keep state, but we could pause it
+            if(sectionId !== 'dino-game' && window.stopDinoGame) window.stopDinoGame();
         }
 
         function toggleStartMenu() {
@@ -397,6 +434,124 @@
                 window.initMCAnimator();
                 window.initMCAnimatorIfNotStarted = function(){};
             }
+        }
+    </script>
+
+    <!-- Dino Game Logic -->
+    <script>
+        let dinoCtx, dinoReqId, dinoSpeed, score;
+        let dino = { x: 50, y: 0, w: 40, h: 40, dy: 0, grounded: false };
+        let obstacles = [];
+        let isNight = false;
+        let gameRunning = false;
+
+        window.initDinoGame = function() {
+            const canvas = document.getElementById('dino-canvas');
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = 300;
+            dinoCtx = canvas.getContext('2d');
+            resetDinoGame();
+        };
+
+        window.resetDinoGame = function() {
+            dino = { x: 50, y: 0, w: 40, h: 40, dy: 0, grounded: false };
+            obstacles = [];
+            score = 0;
+            dinoSpeed = 6;
+            isNight = false;
+            gameRunning = true;
+            document.getElementById('dino-gameover').classList.add('hidden');
+            if(dinoReqId) cancelAnimationFrame(dinoReqId);
+            updateDino();
+        };
+
+        window.stopDinoGame = function() {
+            gameRunning = false;
+            if(dinoReqId) cancelAnimationFrame(dinoReqId);
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if(!gameRunning || document.getElementById('dino-game').classList.contains('hidden')) return;
+            if (e.code === 'Space' && dino.grounded) {
+                dino.dy = -15;
+                dino.grounded = false;
+            }
+        });
+
+        function updateDino() {
+            if (!gameRunning) return;
+            dinoReqId = requestAnimationFrame(updateDino);
+
+            const canvas = document.getElementById('dino-canvas');
+            const groundY = canvas.height - 50;
+
+            // Physics
+            dino.dy += 0.8; // Gravity
+            dino.y += dino.dy;
+            if (dino.y + dino.h > groundY) {
+                dino.y = groundY - dino.h;
+                dino.dy = 0;
+                dino.grounded = true;
+            }
+
+            // Obstacles
+            if (Math.random() < 0.015) {
+                const type = Math.random() > 0.7 ? 'bird' : 'cactus';
+                let obs = { x: canvas.width, w: 30, h: 50, type: type };
+                if (type === 'bird') {
+                    obs.y = groundY - 80 - Math.random() * 50;
+                    obs.w = 40; obs.h = 20;
+                } else {
+                    obs.y = groundY - 50;
+                }
+                obstacles.push(obs);
+            }
+
+            obstacles.forEach(obs => obs.x -= dinoSpeed);
+            obstacles = obstacles.filter(obs => obs.x + obs.w > 0);
+
+            // Collision & Score
+            let collision = false;
+            obstacles.forEach(obs => {
+                if (dino.x < obs.x + obs.w && dino.x + dino.w > obs.x &&
+                    dino.y < obs.y + obs.h && dino.y + dino.h > obs.y) {
+                    collision = true;
+                }
+                // Increase speed per obstacle passed
+                if(obs.x + obs.w < dino.x && !obs.passed) {
+                    obs.passed = true;
+                    dinoSpeed += 0.1; 
+                }
+            });
+
+            if (collision) {
+                gameRunning = false;
+                document.getElementById('dino-gameover').classList.remove('hidden');
+            }
+
+            score++;
+            document.getElementById('dino-score').innerText = `Score: ${Math.floor(score/10)} | Speed: ${dinoSpeed.toFixed(1)}`;
+
+            // Day/Night
+            if (Math.floor(score/1000) % 2 === 1) isNight = true; else isNight = false;
+
+            // Draw
+            dinoCtx.fillStyle = isNight ? '#222' : '#fff';
+            dinoCtx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Ground Line
+            dinoCtx.fillStyle = isNight ? '#fff' : '#555';
+            dinoCtx.fillRect(0, groundY, canvas.width, 2);
+
+            // Dino
+            dinoCtx.fillStyle = isNight ? '#0f0' : '#333';
+            dinoCtx.fillRect(dino.x, dino.y, dino.w, dino.h);
+
+            // Obstacles
+            obstacles.forEach(obs => {
+                dinoCtx.fillStyle = obs.type === 'cactus' ? (isNight ? '#f00' : '#0a0') : (isNight ? '#ff0' : '#00a');
+                dinoCtx.fillRect(obs.x, obs.y, obs.w, obs.h);
+            });
         }
     </script>
 
